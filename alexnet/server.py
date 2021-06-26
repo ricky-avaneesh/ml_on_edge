@@ -64,38 +64,53 @@ def tail_prediction():
     print("---------------------------------------------------------")
     print("[REQUEST]  received from client for single image")
     print("---------------------------------------------------------")
+
+
     data = request.json
     time_upload = time.time() - data["time_client_sends_activation"]
     time_server_inference_start = time.time()
     i = data["i"]
     activations = np.array(data["activation"])
     activations = torch.from_numpy(activations)
+    
+
     print("[SHAPE] of activations received from server")
     print("---------------------------------------------------------")
     print(activations.shape)
     print("---------------------------------------------------------")
     print("[PREDICTING] output from intermediate activations")
+    
     tailnetwork = TailNet(layers_of_network , i)
     with torch.no_grad():
         output = tailnetwork(activations.float())
+    
     print("[OUTPUT] of the network")
     print("---------------------------------------------------------")
     print(output.shape)
     print("---------------------------------------------------------")
     print("[NORMALISING] the outputs")
+    
     probabilities = torch.nn.functional.softmax(output[0], dim=0)
+    
     print("---------------------------------------------------------")
     print("[PREDICTING] the labels")
     print("---------------------------------------------------------")
+    
+
     with open("imagenet_classes.txt", "r") as f:
         categories = [s.strip() for s in f.readlines()]
     top5_prob, top5_catid = torch.topk(probabilities, 5)
     for i in range(top5_prob.size(0)):
         print(categories[top5_catid[i]], top5_prob[i].item())
+    
+
     print("---------------------------------------------------------")
     print("[SENDING] the prediction to client")
     print("---------------------------------------------------------")
+    
+
     time_inference_server_stop = time.time() - time_server_inference_start
+    
     data_ = {'category' : categories[top5_catid[0]] , 'confidence_score' : top5_prob[0].item() , 'time_upload' : time_upload , 'time_inference_server': time_inference_server_stop , 'time_server_sends_client':time.time()}
     return json.dumps(data_)   
 

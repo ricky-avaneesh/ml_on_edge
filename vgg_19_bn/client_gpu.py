@@ -1,4 +1,5 @@
 #IMPORTING REQUIRED HELPER MODULES
+import csv
 import random
 import time
 import requests
@@ -7,7 +8,7 @@ import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
 #Setting figure size
-plt.rcParams["figure.figsize"] = (20,3)
+plt.rcParams["figure.figsize"] = (20,6)
 
 #IMPORTING PYTORCH MODULES
 import torch
@@ -142,6 +143,24 @@ def time_image_predictions(image_path):
     print("---------------------------------------------------------")
     print(f"[TOTAL] layers of network - {len(layers_of_network)}")
     total_time_list = []
+    client_conv_time = []
+    fmap_trans_time = []
+    result_tx_time = []
+    server_conv_time = []
+
+
+    csv_file = open("time_gpu.csv","w+", newline='')
+    writer = csv.writer(csv_file)
+    # writer = csv.writer(csv_file, delimiter='|')
+
+
+    field_names = ["Layer Number",
+                   "client_conv_time",
+                   "client_2_server_tx_time",
+                   "server_conv_time",
+                   "server_2_client_tx_time",
+                   "layer_type"]
+    writer.writerow(field_names)
     for i in range(len(layers_of_network)-1):
         time_inference_client_start = time.time()
         headnetwork = HeadNet(layers_of_network , i)
@@ -167,12 +186,37 @@ def time_image_predictions(image_path):
         print(f"[TOTAL TIME is {total_time}")
         total_time_list.append((i , total_time))
         print("---------------------------------------------------------")
-    print(total_time_list)
-    plt.scatter(*zip(*total_time_list))
+        
+        client_conv_time.append((i,time_inference_total_client))
+        fmap_trans_time.append((i,result['time_upload']))
+        result_tx_time.append((i,download_time))
+        server_conv_time.append((i,result['time_inference_server']))
+
+        writer.writerow([
+                            str(i+1),
+                            time_inference_total_client,
+                            result['time_upload'],
+                            result['time_inference_server'],
+                            download_time,
+                            str(layers_of_network[i])
+
+                        ])
+
+    field_names = ["Layer Number","client_conv_time","servver_2_client_tx_time","client_2_server_tx_time", "layer_type"]
+    # print(total_time_list)
+    plt.plot(*zip(*total_time_list), '^k-', label = "Total Time")
+    plt.plot(*zip(*client_conv_time), color = 'r', label = "Conv at Edge")
+    plt.plot(*zip(*server_conv_time), color = 'y', label = "Conv at Server")
+    plt.plot(*zip(*fmap_trans_time), '--g', label = "Edge to Server TX")
+    plt.plot(*zip(*result_tx_time), '--b', label = "Server to Edge TX")
+    
     plt.xticks(np.arange(0,len(layers_of_network) - 1, 1.0))
     plt.title("Time for CNN splits")
     plt.xlabel("SPLIT LAYER NUMBER")
     plt.ylabel("TOTAL TIME")
+    plt.legend(loc='best')
+
+    plt.savefig("vgg19_bn_edge_gpu.eps",format='eps', dpi=1000)
     plt.show()
 
 #------------------------------------------------------------------------------------------------------------
